@@ -1046,7 +1046,7 @@ BOOL ExecuteRemoteCommand()
 		response.dwErrorCode, 
 		response.dwErrorCode );
 
-	return TRUE;
+	return response.dwErrorCode;
 }
 
 BOOL WINAPI ConsoleCtrlHandler( DWORD dwCtrlType )
@@ -2058,7 +2058,7 @@ int _tmain( DWORD, TCHAR**, TCHAR** )
    }  
 
    // Send the message to remote service to start the remote process
-   ExecuteRemoteCommand();
+   rc = ExecuteRemoteCommand();
  
  }
 

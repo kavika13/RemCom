@@ -106,7 +106,7 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>userenv.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <OutputFile>.\Debug/ProcComs.exe</OutputFile>
+      <OutputFile>Debug/ProcComs.bin</OutputFile>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ProgramDatabaseFile>.\Debug/ProcComs.pdb</ProgramDatabaseFile>
