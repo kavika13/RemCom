@@ -1,8 +1,12 @@
-<h1>RemCom</h1>
+#RemCom
 
 This is a fork of [the RemCom project](http://talhatariq.wordpress.com/2006/04/14/the-open-source-psexec/), since that project seems dead, and there are patches to be made.
 
+For the most "official" documentation of this branch, see [the wiki](https://github.com/kavika13/RemCom/wiki).  The rest of this description is a placeholder for now.
+
 From their site:
+
+---
 
 **[RemCom - The open source psexec](http://sourceforge.net/projects/rce/)**
 
