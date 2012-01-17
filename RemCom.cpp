@@ -5,7 +5,7 @@
 	Permission to use, copy, modify, and distribute this software 
 	for any purpose and without any fee is hereby granted, 
 	provided this notice is included in its entirety in the 
-	documentation and in the source files.g
+	documentation and in the source files.
 
 	This software and any related documentation is provided "as is" 
 	without any warranty of any kind, either express or implied, 
