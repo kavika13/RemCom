@@ -7,7 +7,6 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-// #include "afxres.h"
 #include "windows.h"
 
 /////////////////////////////////////////////////////////////////////////////
@@ -87,7 +86,7 @@ BEGIN
             VALUE "FileDescription", "Remote Command Executor\0"
             VALUE "FileVersion", "1, 0, 0, 1\0"
             VALUE "InternalName", "RemCom\0"
-            VALUE "LegalCopyright", "Copyright © 2006 The WiseGuyz [ talha.tariq@gmail.com ]\0"
+            VALUE "LegalCopyright", "Copyright ï¿½ 2006 The WiseGuyz [ talha.tariq@gmail.com ]\0"
             VALUE "LegalTrademarks", "http://talhatariq.wordpress.com\0"
             VALUE "OriginalFilename", "RemCom.exe\0"
             VALUE "PrivateBuild", "\0"
