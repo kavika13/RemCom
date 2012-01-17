@@ -4,7 +4,7 @@ This is a fork of [the RemCom project](http://talhatariq.wordpress.com/2006/04/1
 
 From their site:
 
-**(RemCom - The open source psexec)** [http://sourceforge.net/projects/rce/]
+**[RemCom - The open source psexec](http://sourceforge.net/projects/rce/)**
 
 Terminal Services are expensive in terms of bandwidth, Utilities like GotoMyPC and remote control programs like PC Anywhere let you execute programs on remote systems, but they take time to set up and require that you install client software on the remote systems that you wish to access and are extremely costly when it comes to running just some administrative commands over a group of systems.
 
