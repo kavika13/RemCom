@@ -5,7 +5,7 @@
 	Permission to use, copy, modify, and distribute this software 
 	for any purpose and without any fee is hereby granted, 
 	provided this notice is included in its entirety in the 
-	documentation and in the source files.
+	documentation and in the source files.g
 
 	This software and any related documentation is provided "as is" 
 	without any warranty of any kind, either express or implied, 
@@ -731,7 +731,7 @@ BOOL BuildMessageStructure( RemComMessage* pMsg )
 
 	// Cmd
 	if ( !IsCmdLineParameter(_T("c")) )
-		_stprintf( pMsg->szCommand, _T("%s %s"), lpszCommandExe, szArguments );
+		_stprintf( pMsg->szCommand, _T("\"%s\" %s"), lpszCommandExe, szArguments );
 	else
 	{
 		TCHAR drive[_MAX_DRIVE];
@@ -1951,7 +1951,7 @@ int _tmain( DWORD, TCHAR**, TCHAR** )
 		if(ExtractLocalBinaryResource()){
 			Out( _T("Launching Local Process ...\n") ); 
 			TCHAR szExeCmdAsUser[MAX_PATH] = _T("");
-			_stprintf( szExeCmdAsUser, _T("%s %s %s %s"), szLocalBinPath, lpszUser, lpszPassword, lpszCommandExe );
+			_stprintf( szExeCmdAsUser, _T("%s %s %s \"%s\""), szLocalBinPath, lpszUser, lpszPassword, lpszCommandExe );
 		
 	/*		printf("lpszUser is %s \n",lpszUser);
 			printf("lpszPassword is %s \n",lpszPassword);
