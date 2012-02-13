@@ -17,7 +17,9 @@
  	$Author:	Talha Tariq [ talha.tariq@gmail.com ] 
 				uses some code from xCmd by Zoltan Csizmadia
 	$Revision:	Talha Tariq [ talha.tariq@gmail.com ] 	
-	$Date: 2006/10/03 09:00:00 $ 		
+	$Revision:	Andres Ederra 
+	
+	$Date: 2012/01/24 09:00:00 $ 		
 	$Version History: $			- 
 	$TODO:						- Implement Delete Service
 	$Description: $				- RemCom Service is contained in the parent binary as a local resource which is extracted at runtime from itself
@@ -248,7 +250,7 @@ DWORD Execute( RemComMessage* pMsg, DWORD* pReturnCode )
 
    // Initializes command
    // cmd.exe /c /q allows us to execute internal dos commands too.
-   _stprintf( szCommand, _T("cmd.exe /q /c \"%s\""), pMsg->szCommand );
+   _stprintf( szCommand, _T("%s"), pMsg->szCommand );
    
    // Start the requested process
    if ( CreateProcess( 
@@ -256,10 +258,10 @@ DWORD Execute( RemComMessage* pMsg, DWORD* pReturnCode )
          szCommand, 
          NULL,
          NULL, 
-         TRUE,
+		 TRUE, 
          pMsg->dwPriority | CREATE_NO_WINDOW,
          NULL, 
-         pMsg->szWorkingDir[0] != _T('\0') ? pMsg->szWorkingDir : NULL, 
+		 pMsg->szWorkingDir[0] != _T('\0') ? pMsg->szWorkingDir : NULL, 
          &si, 
          &pi ) )
    {
