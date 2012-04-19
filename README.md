@@ -4,6 +4,9 @@ This is a fork of [the RemCom project](http://talhatariq.wordpress.com/2006/04/1
 
 For the most "official" documentation of this branch, see [the wiki](https://github.com/kavika13/RemCom/wiki).  The rest of this description is a placeholder for now.
 
+Changes since fork:
+
+
 From their site:
 
 ---

@@ -1,5 +1,8 @@
 /*
-	Copyright (c) 2006 Talha Tariq [ talha.tariq@gmail.com ] 
+	Copyright (c) 2006-2012 Talha Tariq [ talha.tariq@gmail.com ] 
+                            Luke Suchocki
+                            Merlyn Morgan-Graham 
+                            Andres Ederra 
 	All rights are reserved.
 
 	Permission to use, copy, modify, and distribute this software 
@@ -16,9 +19,15 @@
 
  	$Author:	Talha Tariq [ talha.tariq@gmail.com ] 
 				uses some code from xCmd by Zoltan Csizmadia
-	$Revision:	Talha Tariq [ talha.tariq@gmail.com ] 	
+	$Revision:	Talha Tariq [ talha.tariq@gmail.com ] 
+	$Revision:  Luke Suchocki (patched  rc)
+	$Revision:  Merlyn Morgan-Graham (handle spaces in the filename)
+	$Revision:	Andres Ederra (support for 64bits targets, send 
+				remcom outout to stderr, support for longer 
+				parameters, escape special characters in command 
+				parameters, detailed error codes)
 	
-	$Date: 2006/10/04 09:00:00 $ 		
+	$Date: 2012/01/24 09:00:00 $ 		
 	
 	$Version History: $			- Refactored and Restructured Code - Deleted Unnecessary variables and Functions for Memory Consumption and Optimisation.
 								- Added Function StartLocalProcessAsUser for local user impersonation
@@ -28,6 +37,26 @@
 								- Added ExtractLocalBinaryResource to extract the local binary resource for local process impersonation
 								- Added ProcComs to implement local  process functionality
 								- Added RemCom   to implement remote process functionality
+								- Patched to give the correct return code
+								- Patched to handle spaces in the filename.
+								- Modified to handle longer command parameters
+								- Changed directory to copy executables to \\ADMIN$ instead of \\ADMIN$\system32 in order to support 64 bits targets
+								- Changed RemCom output to be sent to stderr while the remote command writes to stdout
+								- Allow to scape '/' character to use it as part of remote command and its parameters.
+								- Reclassified error return codes. Now RemCom returns its own return code, and the remote program return code is show at the stdout.
+									//Return Codes:
+									//
+									// (-1) Incorrect parameters
+									// (-2) Malformed credentials
+									// (-3) Invalid target name
+									// (-4) Bad credentials
+									// (-5) Could not connect to target
+									// (-6) Error copying executable
+									// (-7) Error copying service
+									// (-8) Error executing service
+									// (-9) Error connecting to remote service
+								- Patched to handle spaces in the filename (FIXED).
+								- Tested with: win2k, winxp(32bits), win2003(32&64), win2008R2(32&64), win7(32&64).
 																
 	$TODO:						- Add Getopt to parse command line parametres more effectively.
 								- Implemement cleanup and disconnect remote share command
@@ -56,7 +85,7 @@
 #define		GENERIC_ACCESS (GENERIC_READ | GENERIC_WRITE | GENERIC_EXECUTE | GENERIC_ALL)
 
 // Constant Definitions
-#define		SIZEOF_BUFFER   0x100
+#define		SIZEOF_BUFFER   0x500
 
 // Local Machine Settings
 TCHAR		szThisMachine[SIZEOF_BUFFER] = _T("");
@@ -106,7 +135,8 @@ DWORD ShowLastError()
 		NULL
 		);            
 	
-//	Error( _T("Error code = %d.\n", GetLastError()) );
+	//Error( _T("Error code = %d.\n", rc) );
+	//_ftprintf( stderr, "Error code = %d.\n", rc);
 	Error( (LPCTSTR)lpvMessageBuffer );
 	Error( _T("\n") );
 
@@ -175,8 +205,7 @@ BOOL IsLaunchedFromAdmin()
 
 	SID_AND_ATTRIBUTES* const end = pTokenGroups->Groups + pTokenGroups->GroupCount;
 
-	SID_AND_ATTRIBUTES* it;
-	for ( it = pTokenGroups->Groups; end != it; ++it )
+	for ( SID_AND_ATTRIBUTES* it = pTokenGroups->Groups; end != it; ++it )
 		if ( EqualSid( it->Sid, pAdminSid ) )
 			break;
 
@@ -303,17 +332,20 @@ Cleanup:
 BOOL IsCmdLineParameter( LPCTSTR lpszParam )
 {
 	for( int i = 1; i < __argc; i++ )
+	{
 		if ( __targv[i][0] == _T('\\') )
 			continue;
 		else
-			if ( __targv[i][0] == _T('/') || __targv[i][0] == _T('-') )
+		{
+			if ( __targv[i][0] == _T('/') )
 			{
 				if ( _tcsicmp( __targv[i] + 1, lpszParam ) == 0 )
 					return TRUE;
 			}
 			else
 				return FALSE;
-
+		}
+	}
 	return FALSE;
 }
 
@@ -321,17 +353,20 @@ LPCTSTR GetParamValue( LPCTSTR lpszParam )
 {
 	DWORD dwParamLength = _tcslen( lpszParam );
 
-	for( int i = 1; i < __argc; i++ )
+	for( int i = 1; i < __argc; i++ ){
 		if ( __targv[i][0] == _T('\\') || __targv[i][0] == _T('.'))
 			continue;
-		else
-			if ( __targv[i][0] == _T('/') || __targv[i][0] == _T('-') )
+		else{
+			if ( __targv[i][0] == _T('/') )
 			{
 				if ( _tcsnicmp( __targv[i] + 1, lpszParam, dwParamLength ) == 0 )
 					return __targv[i] + dwParamLength + 1;
+				
 			}
 			else
 				return NULL;
+		}
+	}
 
 	return NULL;
 }
@@ -342,13 +377,25 @@ LPCTSTR GetNthParameter( DWORD n, DWORD& argvIndex )
 
 	for( int i = 1; i < __argc; i++ )
 	{
-		if ( __targv[i][0] != _T('/') && __targv[i][0] != _T('-') )
+
+		DWORD dwParamLength = _tcslen( __targv[i] );
+
+		bool bIsEscaped=false;
+
+		if ( __targv[i][0] != _T('/') ){
 			index++;
+		}else{
+			if( dwParamLength > 1 && ( __targv[i][1] == _T('/') ) ){
+				bIsEscaped=true;
+				index++;
+			}
+		}
 
 		if ( index == n )
 		{
 			argvIndex = i;
-			return __targv[i];
+
+			return bIsEscaped ? ( __targv[i] + sizeof(__targv[i][0]) ) : __targv[i];
 		}
 	}
 
@@ -364,7 +411,12 @@ void GetRemoteCommandArguments( LPTSTR lpszCommandArguments )
 	if ( GetNthParameter( 3, dwIndex ) != NULL )
 		for( int i = dwIndex; i < __argc; i++ )
 		{
-			_tcscat( lpszCommandArguments, __targv[i] );
+			DWORD dwParamLen = _tcslen( __targv[i] );
+			if ( (__targv[i][0] == '/') && (dwParamLen>1 && __targv[i][1] == '/') ){
+				_tcscat( lpszCommandArguments, __targv[i]+sizeof(__targv[i][0]) );
+			}else{
+				_tcscat( lpszCommandArguments, __targv[i] );
+			}
 			if ( i + 1 < __argc )
 				_tcscat( lpszCommandArguments, _T(" ") );
 		}
@@ -520,7 +572,7 @@ BOOL EstablishConnection( LPCTSTR lpszRemote, LPCTSTR lpszResource, BOOL bEstabl
 	return FALSE;
 }
 
-// Copies the command's exe file to remote machine (\\remote\ADMIN$\System32)
+// Copies the command's exe file to remote machine (\\remote\ADMIN$)
 // This function called, if the /c option is used
 BOOL CopyBinaryToRemoteSystem()
 {
@@ -536,9 +588,9 @@ BOOL CopyBinaryToRemoteSystem()
 	// Gets the file name and extension
 	_tsplitpath( lpszCommandExe, drive, dir, fname, ext );
 
-	_stprintf( szRemoteResource, _T("%s\\ADMIN$\\System32\\%s%s"), lpszMachine, fname, ext );
+	_stprintf( szRemoteResource, _T("%s\\ADMIN$\\%s%s"), lpszMachine, fname, ext );
 
-	// Copy the Command's exe file to \\remote\ADMIN$\System32
+	// Copy the Command's exe file to \\remote\ADMIN$
 	return CopyFile( lpszCommandExe, szRemoteResource, FALSE );
 }
 
@@ -731,7 +783,7 @@ BOOL BuildMessageStructure( RemComMessage* pMsg )
 
 	// Cmd
 	if ( !IsCmdLineParameter(_T("c")) )
-		_stprintf( pMsg->szCommand, _T("\"%s\" %s"), lpszCommandExe, szArguments );
+		_stprintf( pMsg->szCommand, _T("%s %s"), lpszCommandExe, szArguments );
 	else
 	{
 		TCHAR drive[_MAX_DRIVE];
@@ -742,7 +794,7 @@ BOOL BuildMessageStructure( RemComMessage* pMsg )
 		_tsplitpath( lpszCommandExe, drive, dir, fname, ext );
 
 		_stprintf( pMsg->szCommand, _T("%s%s %s"), fname, ext, szArguments );
-	}
+	}	
 
 	// Priority
 	if ( IsCmdLineParameter( _T("realtime") ) )
@@ -1029,21 +1081,24 @@ BOOL ExecuteRemoteCommand()
 	// Connects to remote pipes (stdout, stdin, stderr)
 	if ( ConnectToRemotePipes( 5, 1000 ) )
 	{
-		Out( _T("Ok\n\n") );
+		Error( _T("Ok\n\n") );
 
 		// Waiting for response from service
+
+		Error( _T("Remote program Stderr start:\n") );
+
 		ReadFile( hCommandPipe, &response, sizeof(response), &dwTemp, NULL );
+		
+		Error( _T("Remote program Stderr end.\n") );
 	}
 	else
-		Out( _T("Failed\n\n") );
+		Error( _T("Failed\n\n") );
 
 	if ( response.dwErrorCode == 0 ) 
-		_tprintf( _T("\nRemote command returned %d(0x%X)\n"), 
-		response.dwReturnCode, 
+		_ftprintf( stderr, _T("\nRemote command returned %d(0x%X)\n"), 
 		response.dwReturnCode );
 	else
-		_tprintf( _T("\nRemote command failed to start. Returned error code is %d(0x%X)\n"), 
-		response.dwErrorCode, 
+		_ftprintf( stderr, _T("\nRemote command failed to start. Returned error code is %d(0x%X)\n"), 
 		response.dwErrorCode );
 
 	return response.dwErrorCode;
@@ -1064,11 +1119,15 @@ BOOL WINAPI ConsoleCtrlHandler( DWORD dwCtrlType )
 
 void ShowCopyRight()
 {
-	Out( _T("\n") );
-	Out( _T("  Remote Command Executor\n") );
-	Out( _T("  Copyright 2006 The WiseGuyz [ http://talhatariq.wordpress.com ] \n") );
-	Out( _T("  Author: Talha Tariq [talha.tariq@gmail.com]\n") );
-	Out( _T("\n") );
+	Error( _T("\n") );
+	Error( _T("  Remote Command Executor\n") );
+	Error( _T("  Copyright 2006-2012 [ https://github.com/kavika13/RemCom ] \n") );
+	Error( _T("  Author: Talha Tariq [talha.tariq@gmail.com]\n") );
+	Error( _T("  Contributor: Luke Suchocki\n") );
+	Error( _T("  Contributor: Merlyn Morgan-Graham\n") );
+	Error( _T("  Contributor: Andres Ederra\n") );
+	
+	Error( _T("\n") );
 }
 
 void ShowUsage()
@@ -1088,7 +1147,7 @@ void ShowUsage()
  Out( _T("  /nowait\t\tDon't wait for remote process to terminate\n") );
  Out( _T("\n") );
  Out( _T(" /c\t\t\tCopy the specified program to the remote machine's\n") );
- Out( _T("   \t\t\t\"%SystemRoot%\\System32\" directory\n") );
+ Out( _T("   \t\t\t\"%SystemRoot%\" directory\n") );
  Out( _T("   \t\t\tCommand's exe file must be absolute to local machine\n") );
  Out( _T("\n") );
  Out( _T("   .........................................................................\n") );
@@ -1098,29 +1157,31 @@ void ShowUsage()
  Out( _T(" RemCom.exe \\\\remote cmd\t[Starts a \"telnet\" client]\n") );
  Out( _T(" RemCom.exe \\\\remote /user:Username /pwd:Password cmd.exe\t[Starts a \"telnet\" client]\n") );
  Out( _T(" RemCom.exe \\\\localhost /user:Username /pwd:Password  \"C:\\InstallMe.bat\"\t[A replacement for RunAs Command]\"\n") );
- Out( _T("\n") );
+ Out( _T(" RemCom.exe \\\\localhost /user:Username /pwd:Password  \"cmd.exe /c dir c:\\\"\t[Executes a cmd.exe, for intance \"dir c:\\\"]\"\n") );
+  Out( _T("\n") );
  Out( _T("   .........................................................................\n") );
  Out( _T("\n") );
  Out( _T("Notes:\n") );
  Out( _T("\n") );
- Out( _T("-  A \".\" for Machine Name will be treated as localhost\n") ); 
+ Out( _T("-  A \".\" for Machine Name will be treated as localhost.\n") ); 
  Out( _T("-  Input is passed to remote machine when you press the ENTER.\n") ); 
- Out( _T("-  Ctrl-C terminates the remote process\n") );
- Out( _T("-  Command and file path arguments have to be absolute to remote machine\n") );
+ Out( _T("-  Ctrl-C terminates the remote process.\n") );
+ Out( _T("-  Command and file path arguments have to be absolute to remote machine.\n") );
  Out( _T("-  If you are using /c option, command exe file path must be absolute to\n") );
  Out( _T("   local machine, but the arguments must be absolute to remote machine\n") );
- Out( _T("-  A dot . for machine name is taken as localhost\n") );
+ Out( _T("-  A dot . for machine name is taken as localhost.\n") );
  Out( _T("-  Not providing any credentials, the Process will (impersonate and) run\n") );  
  Out( _T("   in the context of your account on the remote system, but will not have\n") );  
- Out( _T("   access to network resources \n") );  
+ Out( _T("   access to network resources.\n") );  
  Out( _T("-  Specify a valid user name in the Domain\\User syntax if the remote process\n") );  
  Out( _T("   requires access to network resources or to run in a different account. \n") );  
  Out( _T("-  The password is transmitted in clear text to the remote system.\n") );  
  Out( _T("-  You can enclose applications that have spaces in their name with \n") );  
- Out( _T("   quotation marks  e.g. RemCom \\\\computername \"c:\\long name app.exe\".\\n") );  
- Out( _T("-  Input is only passed to the remote system when you press the enter key \n") );  
- Out( _T("-  Typing Ctrl-C terminates the remote process.            \n") );  
- Out( _T("-  Error codes returned by RemCom are specific to the applications you execute, not RemCom.\n") );  
+ Out( _T("   quotation marks  e.g. RemCom \\\\computername \"c:\\long name app.exe\".\n") );  
+ Out( _T("-  Input is only passed to the remote system when you press the enter key.\n") );  
+ Out( _T("-  Typing Ctrl-C terminates the remote process.\n") );  
+ Out( _T("-  Error codes from the applications you execute are shown as part of remcom output.\n")
+ Out( _T("-  RemCom error code list can be found at the documentation and sources.\n") );  
  Out( _T(" \n") );  
  Out( _T("   .........................................................................\n") );
 
@@ -1890,6 +1951,17 @@ BOOL StartLocalProcessAsUser(){
 }
 
 // Main function
+//Return Codes:
+//
+// (-1) Incorrect parameters
+// (-2) Malformed credentials
+// (-3) Invalid target name
+// (-4) Bad credentials
+// (-5) Could not connect to target
+// (-6) Error copying executable
+// (-7) Error copying service
+// (-8) Error executing service
+// (-9) Error connecting to remote service
 int _tmain( DWORD, TCHAR**, TCHAR** )
 {
 	int   rc = 0;
@@ -1926,7 +1998,7 @@ int _tmain( DWORD, TCHAR**, TCHAR** )
 	// Gets our computer's name
 	if ( !GetComputerName( szThisMachine, &dwTemp ) )
 	{
-		Out( _T("GetComputerName() failed. Use a valid name! :)\n") );
+		Error( _T("GetComputerName() failed. Use a valid name! :)\n") );
 		return -3;
 	}
 
@@ -1943,28 +2015,27 @@ int _tmain( DWORD, TCHAR**, TCHAR** )
 	if( ( _tcsnicmp(lpszMachine, lpszLocalMachine, 16) == 0) || (_tcsnicmp(lpszMachine, lpszLocalIP, 16) == 0) || (_tcsnicmp(lpszMachine, ".", 2) == 0) )
 	{
 		if(IsLaunchedFromAdmin()){
-			Out( _T("Local Admin\n\n") );   
+			Error( _T("Local Admin\n\n") );   
 		}
 		Out( _T("Localhost entered for Target Machine .. Going to RunAs Command\n\n") );   
 		lpszMachine = "\\\\127.0.0.1";
 
 		if(ExtractLocalBinaryResource()){
-			Out( _T("Launching Local Process ...\n") ); 
+			Error( _T("Launching Local Process ...\n") ); 
 			TCHAR szExeCmdAsUser[MAX_PATH] = _T("");
-			_stprintf( szExeCmdAsUser, _T("%s %s %s \"%s\""), szLocalBinPath, lpszUser, lpszPassword, lpszCommandExe );
-		
+			_stprintf( szExeCmdAsUser, _T("%s %s %s %s"), szLocalBinPath, lpszUser, lpszPassword, lpszCommandExe );		
 	/*		printf("lpszUser is %s \n",lpszUser);
 			printf("lpszPassword is %s \n",lpszPassword);
 			printf("lpszCommandExe is %s \n",lpszCommandExe);
 			printf("szExeCmdAsUser is %s \n",szExeCmdAsUser);
 	*/
 			if(!StartLocalProcess(szExeCmdAsUser)){
-				Out( _T("Create Local Process Failed. Illegal Command") );   
+				Error( _T("Create Local Process Failed. Illegal Command") );   
 			}
 			DeleteFile(szLocalBinPath);
 		}
 		else{
-			Out( _T("Cannot Extract Local Resources. Please check write access to local tmp filesystem\n") );   
+			Error( _T("Cannot Extract Local Resources. Please check write access to local tmp filesystem\n") );   
 			
 			Out( _T("Create Process as User Failed. Trying to run the process with the current user\n\n") );   
 			StartLocalProcess((LPTSTR) lpszCommandExe); // Creates a Run As Command	 
@@ -1979,42 +2050,84 @@ int _tmain( DWORD, TCHAR**, TCHAR** )
    else
    //Remote Machine
    {
-	 Out( _T("Initiating Connection to Remote Service . . .  ") );
+	 Error( _T("Initiating Connection to Remote Service . . .  ") );
 	// Connect to remote machine's ADMIN$
    if ( !EstablishConnection( lpszMachine, _T("ADMIN$"), TRUE ) )
    {
-      rc = -2;
-      Out( _T("Failed\n\n") );
-      Error( _T("Couldn't connect to ") )
-      Error( lpszMachine );
-      Error( _T("\\ADMIN$\n") );
-      ShowLastError();
-      goto cleanup;
+	  switch(GetLastError( )){
+	  	case ERROR_ACCESS_DENIED:
+		case ERROR_INVALID_PASSWORD:
+		case ERROR_LOGON_FAILURE:
+		case ERROR_SESSION_CREDENTIAL_CONFLICT:
+			rc = -4;
+			Error( _T("Failed\n\n") );
+			Error( _T("Couldn't connect to ") )
+			Error( lpszMachine );
+			Error( _T("\\ADMIN$\n") );
+			Error( _T("Bad credentials.\n") );
+	
+		break;
+
+		default:
+			rc = -5;
+			Error( _T("Failed\n\n") );
+			Error( _T("Couldn't connect to ") )
+			Error( lpszMachine );
+			Error( _T("\\ADMIN$\n") );
+			Error( _T("Connection failed.\n") );
+
+		break;
+	  }
+
+	  ShowLastError();
+	  goto cleanup;
+
    }
 
    // Connect to remote machine IPC$
    if ( !EstablishConnection( lpszMachine, _T("IPC$"), TRUE ) )
    {
-      rc = -2;
-      Out( _T("Failed\n\n") );
-      Error( _T("Couldn't connect to ") )
-      Error( lpszMachine );
-      Error( _T("\\IPC$\n") );
-      ShowLastError();
-      goto cleanup;
+
+	  switch(GetLastError( )){
+	  	case ERROR_ACCESS_DENIED:
+		case ERROR_INVALID_PASSWORD:
+		case ERROR_LOGON_FAILURE:
+		case ERROR_SESSION_CREDENTIAL_CONFLICT:
+			rc = -4;
+			Error( _T("Failed\n\n") );
+			Error( _T("Couldn't connect to ") )
+			Error( lpszMachine );
+			Error( _T("\\IPC$\n") );
+			Error( _T("Bad credentials.\n") );
+	
+		break;
+
+		default:
+			rc = -5;
+			Error( _T("Failed\n\n") );
+			Error( _T("Couldn't connect to ") )
+			Error( lpszMachine );
+			Error( _T("\\ADMIN$\n") );
+			Error( _T("Connection failed.\n") );
+
+		break;
+	  }
+
+	  ShowLastError();
+	  goto cleanup;
    }
 
      
    // Copy the command's exe file to remote machine (if using /c)
    if ( !CopyBinaryToRemoteSystem() )
    {
-      rc = -2;
-      Out( _T("Failed\n\n") );
+      rc = -6;
+      Error( _T("Failed\n\n") );
       Error( _T("Couldn't copy ") );
       Error( lpszCommandExe );
       Error( _T(" to ") );
       Error( lpszMachine );
-      Error( _T("\\ADMIN$\\System32\n") );
+ 	  Error( _T("\\ADMIN$\n") );
       ShowLastError();
       goto cleanup;
    }
@@ -2024,14 +2137,16 @@ int _tmain( DWORD, TCHAR**, TCHAR** )
    {
       //We couldn't connect, so let's install it and start it
 
-      // Copy the service executable to \\remote\ADMIN$\System32
-      if ( !CopyServiceToRemoteMachine() )
+      // Copy the service executable to \\remote\ADMIN$
+      
+	   if ( !CopyServiceToRemoteMachine() )
       {
-         rc = -2;
-         Out( _T("Failed\n\n") );
+         rc = -7;
+         Error( _T("Failed\n\n") );
          Error( _T("Couldn't copy service to ") );
          Error( lpszMachine );
-         Error( _T("\\ADMIN$\\System32\n") );
+         //Error( _T("\\ADMIN$\\System32\n") );
+		 Error( _T("\\ADMIN$\n") );
          ShowLastError();
          goto cleanup;
       }
@@ -2039,8 +2154,8 @@ int _tmain( DWORD, TCHAR**, TCHAR** )
       // Install and start service on remote machine
       if ( !InstallAndStartRemoteService() )
       {
-         rc = -2;
-         Out( _T("Failed\n\n") );
+         rc = -8;
+         Error( _T("Failed\n\n") );
          Error( _T("Couldn't start remote service\n") );
          ShowLastError();
          goto cleanup;
@@ -2049,8 +2164,8 @@ int _tmain( DWORD, TCHAR**, TCHAR** )
       // Try to connect again
       if ( !ConnectToRemoteService( 5, 1000 ) )
       {
-         rc = -2;
-         Out( _T("Failed\n\n") );
+         rc = -9;
+         Error( _T("Failed\n\n") );
          Error( _T("Couldn't connect to remote service\n") );
          ShowLastError();
          goto cleanup;
