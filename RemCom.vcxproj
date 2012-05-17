@@ -11,6 +11,7 @@
     </ProjectConfiguration>
   </ItemGroup>
   <PropertyGroup Label="Globals">
+    <ProjectGuid>{8CC59FFA-00E0-0AEA-59E8-E780672C3CB3}</ProjectGuid>
     <RootNamespace>RemCom</RootNamespace>
     <SccProjectName />
     <SccLocalPath />

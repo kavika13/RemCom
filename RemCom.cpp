@@ -204,8 +204,9 @@ BOOL IsLaunchedFromAdmin()
 	void* pAdminSid = GetAdminSid();
 
 	SID_AND_ATTRIBUTES* const end = pTokenGroups->Groups + pTokenGroups->GroupCount;
+	SID_AND_ATTRIBUTES* it;
 
-	for ( SID_AND_ATTRIBUTES* it = pTokenGroups->Groups; end != it; ++it )
+	for ( it = pTokenGroups->Groups; end != it; ++it )
 		if ( EqualSid( it->Sid, pAdminSid ) )
 			break;
 
@@ -1180,7 +1181,7 @@ void ShowUsage()
  Out( _T("   quotation marks  e.g. RemCom \\\\computername \"c:\\long name app.exe\".\n") );  
  Out( _T("-  Input is only passed to the remote system when you press the enter key.\n") );  
  Out( _T("-  Typing Ctrl-C terminates the remote process.\n") );  
- Out( _T("-  Error codes from the applications you execute are shown as part of remcom output.\n")
+ Out( _T("-  Error codes from the applications you execute are shown as part of remcom output.\n") );
  Out( _T("-  RemCom error code list can be found at the documentation and sources.\n") );  
  Out( _T(" \n") );  
  Out( _T("   .........................................................................\n") );

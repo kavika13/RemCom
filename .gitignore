@@ -1,0 +1,6 @@
+Debug
+Release
+*.user
+*.sdf
+*.suo
+_Resharper.*
