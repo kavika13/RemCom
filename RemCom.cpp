@@ -671,7 +671,7 @@ BOOL CopyServiceToRemoteMachine()
 
 	TCHAR szSvcExePath[_MAX_PATH];
 
-	_stprintf( szSvcExePath, _T("%s\\ADMIN$\\System32\\%s"), lpszMachine, RemComSVCEXE );
+	_stprintf( szSvcExePath, _T("%s\\ADMIN$\\%s"), lpszMachine, RemComSVCEXE );
 
 	// Copy binary file from resources to \\remote\ADMIN$\System32
 	HANDLE hFileSvcExecutable = CreateFile( 
@@ -712,7 +712,7 @@ BOOL InstallAndStartRemoteService()
 		SERVICE_ALL_ACCESS, 
 		SERVICE_WIN32_OWN_PROCESS,
 		SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL,
-		_T("%SystemRoot%\\system32\\")RemComSVCEXE,
+		_T("%SystemRoot%\\")RemComSVCEXE,
 		NULL, NULL, NULL, NULL, NULL );
 
 	if (hService == NULL)
@@ -1143,7 +1143,7 @@ void ShowUsage()
  Out( _T(" /pwd:[password|*]\tPassword. * will delay the input (if required)\n") );
  Out( _T("\n") );
  Out( _T(" /d:directory\t\tSet working directory\n") );
- Out( _T("\t\t\t(Default: \\\\RemoteSystem\"%SystemRoot%\\System32\")\n\n") );
+ Out( _T("\t\t\t(Default: \\\\RemoteSystem\"%SystemRoot%\")\n\n") );
  Out( _T(" [/idle | /normal | /high | /realtime]\tPriority class (use only one)\n") );
  Out( _T("  /nowait\t\tDon't wait for remote process to terminate\n") );
  Out( _T("\n") );
@@ -1388,7 +1388,7 @@ BOOL StartProcessWithUserLogon()
 		LOGON_WITH_PROFILE, 
 		NULL,		
 		(LPWSTR) lpszCommandExe, 		
-		CREATE_UNICODE_ENVIRONMENT, 		/*lpvEnv*/ NULL, 	(LPCWSTR) "%SYSTEMROOT%\\system32",  
+		CREATE_UNICODE_ENVIRONMENT, 		/*lpvEnv*/ NULL, 	(LPCWSTR) "%SYSTEMROOT%",  
 		&si, 
 		&pi
 		);
