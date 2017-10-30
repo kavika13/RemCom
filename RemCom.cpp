@@ -1097,10 +1097,10 @@ BOOL ExecuteRemoteCommand()
 
 	if ( response.dwErrorCode == 0 ) 
 		_ftprintf( stderr, _T("\nRemote command returned %d(0x%X)\n"), 
-		response.dwReturnCode );
+		response.dwReturnCode, response.dwReturnCode);
 	else
 		_ftprintf( stderr, _T("\nRemote command failed to start. Returned error code is %d(0x%X)\n"), 
-		response.dwErrorCode );
+		response.dwErrorCode, response.dwReturnCode);
 
 	return response.dwErrorCode;
 }

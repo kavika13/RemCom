@@ -129,8 +129,6 @@ void wmain(int argc, WCHAR *argv[])
 
     if (!CreateEnvironmentBlock(&lpvEnv, hToken, TRUE))    ShowLastError(L"CreateEnvironmentBlock");
 
-    dwSize = sizeof(szUserProfile)/sizeof(WCHAR);
-
     if (!GetUserProfileDirectory(hToken, szUserProfile, &dwSize))        ShowLastError(L"GetUserProfileDirectory");
     //
     // TO DO: change NULL to '.' to use local account database
